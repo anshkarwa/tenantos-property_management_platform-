@@ -1,0 +1,727 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ═══════════════════════════════════════════════════════════
+   TENANTOS — DESIGN SYSTEM
+   Token system: 5 named color roles, strict 8px grid,
+   one border-radius, Syne display + Inter body.
+═══════════════════════════════════════════════════════════ */
+
+@layer base {
+  :root {
+    --bg:        #08090C;
+    --surface:   #0F1117;
+    --border:    #1C1F2A;
+    --ink:       #E8EAF0;
+    --ink-dim:   #5A617A;
+    --primary:   #3D7BFF;
+    --primary-dim: rgba(61, 123, 255, 0.12);
+    --primary-glow: rgba(61, 123, 255, 0.28);
+    --accent:    #00D4A0;
+    --accent-dim: rgba(0, 212, 160, 0.12);
+    --danger:    #FF4D6D;
+    --danger-dim: rgba(255, 77, 109, 0.12);
+    --warning:   #F59E0B;
+    --warning-dim: rgba(245, 158, 11, 0.12);
+
+    --radius:    8px;
+    --radius-sm: 4px;
+    --radius-xl: 12px;
+  }
+
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    background-color: var(--bg);
+    color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overflow-x: hidden;
+  }
+
+  ::selection {
+    background-color: var(--primary-dim);
+    color: var(--ink);
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 4px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--ink-dim);
+  }
+
+  /* ── Reduced motion: kill all transitions/animations ── */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+
+  /* ── Focus ring (keyboard only) ── */
+  :focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--primary);
+  }
+  /* Remove default outline for mouse users */
+  :focus:not(:focus-visible) {
+    outline: none;
+  }
+}
+
+@layer components {
+
+  /* ─────────────────────────────────────────────────────────
+     BUTTONS
+  ───────────────────────────────────────────────────────── */
+
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2
+           px-4 py-2 rounded-lg text-sm font-semibold
+           text-white transition-all duration-150;
+    background: var(--primary);
+    box-shadow: 0 0 0 0 var(--primary-glow);
+  }
+  .btn-primary:hover {
+    background: #5090ff;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 16px var(--primary-glow);
+  }
+  .btn-primary:active {
+    transform: translateY(0);
+    background: #2d6aee;
+    box-shadow: none;
+  }
+  .btn-primary:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+  }
+
+  /* Hero CTA — premium pill button */
+  .btn-hero {
+    @apply inline-flex items-center justify-center gap-2.5
+           font-semibold text-white
+           transition-all duration-300 relative overflow-hidden;
+    padding: 14px 32px;
+    border-radius: 100px;
+    font-size: 0.9375rem;
+    letter-spacing: -0.01em;
+    background: linear-gradient(135deg, #2d6aee 0%, #3D7BFF 40%, #6a5aff 100%);
+    box-shadow:
+      0 0 0 1px rgba(61,123,255,0.35),
+      0 4px 24px rgba(61,123,255,0.35),
+      0 1px 0 rgba(255,255,255,0.08) inset;
+    isolation: isolate;
+  }
+  /* Animated shimmer */
+  .btn-hero::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      105deg,
+      transparent 30%,
+      rgba(255,255,255,0.12) 50%,
+      transparent 70%
+    );
+    background-size: 200% 100%;
+    background-position: -100% 0;
+    transition: background-position 0.45s ease;
+    border-radius: inherit;
+  }
+  .btn-hero:hover::before {
+    background-position: 100% 0;
+  }
+  .btn-hero:hover {
+    transform: translateY(-2px);
+    box-shadow:
+      0 0 0 1px rgba(61,123,255,0.5),
+      0 8px 32px rgba(61,123,255,0.5),
+      0 1px 0 rgba(255,255,255,0.12) inset;
+  }
+  .btn-hero:active {
+    transform: translateY(0);
+    box-shadow:
+      0 0 0 1px rgba(61,123,255,0.3),
+      0 2px 8px rgba(61,123,255,0.25);
+  }
+  /* Arrow animates on hover */
+  .btn-hero .btn-hero-arrow {
+    transition: transform 0.2s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  .btn-hero:hover .btn-hero-arrow {
+    transform: translateX(3px);
+  }
+
+  /* Nav-sized variant of btn-hero */
+  .btn-hero-sm {
+    @apply inline-flex items-center justify-center gap-1.5
+           font-semibold text-white
+           transition-all duration-300 relative overflow-hidden;
+    padding: 6px 16px;
+    border-radius: 100px;
+    font-size: 0.75rem;
+    letter-spacing: -0.01em;
+    background: linear-gradient(135deg, #2d6aee 0%, #3D7BFF 40%, #6a5aff 100%);
+    box-shadow:
+      0 0 0 1px rgba(61,123,255,0.35),
+      0 2px 12px rgba(61,123,255,0.3),
+      0 1px 0 rgba(255,255,255,0.08) inset;
+    isolation: isolate;
+  }
+  .btn-hero-sm::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      105deg,
+      transparent 30%,
+      rgba(255,255,255,0.12) 50%,
+      transparent 70%
+    );
+    background-size: 200% 100%;
+    background-position: -100% 0;
+    transition: background-position 0.45s ease;
+    border-radius: inherit;
+  }
+  .btn-hero-sm:hover::before {
+    background-position: 100% 0;
+  }
+  .btn-hero-sm:hover {
+    transform: translateY(-1px);
+    box-shadow:
+      0 0 0 1px rgba(61,123,255,0.5),
+      0 4px 20px rgba(61,123,255,0.45),
+      0 1px 0 rgba(255,255,255,0.12) inset;
+  }
+  .btn-hero-sm:active {
+    transform: translateY(0);
+    box-shadow: 0 0 0 1px rgba(61,123,255,0.3), 0 1px 6px rgba(61,123,255,0.2);
+  }
+  .btn-hero-sm .btn-hero-arrow {
+    transition: transform 0.2s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  .btn-hero-sm:hover .btn-hero-arrow {
+    transform: translateX(2px);
+  }
+
+  /* Pulsing glow ring animation */
+  @keyframes heroPulse {
+    0%, 100% { box-shadow: 0 0 0 1px rgba(61,123,255,0.35), 0 4px 24px rgba(61,123,255,0.35), 0 1px 0 rgba(255,255,255,0.08) inset; }
+    50%       { box-shadow: 0 0 0 1px rgba(61,123,255,0.55), 0 4px 32px rgba(61,123,255,0.55), 0 1px 0 rgba(255,255,255,0.08) inset; }
+  }
+  .btn-hero {
+    animation: heroPulse 3s ease-in-out infinite;
+  }
+  .btn-hero:hover {
+    animation: none;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2
+           px-4 py-2 rounded-lg text-sm font-medium
+           transition-all duration-150;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--ink-dim);
+  }
+  .btn-secondary:hover {
+    background: rgba(232, 234, 240, 0.05);
+    border-color: rgba(232, 234, 240, 0.15);
+    color: var(--ink);
+  }
+  .btn-secondary:active {
+    background: rgba(232, 234, 240, 0.08);
+  }
+  .btn-secondary:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2
+           px-3 py-2 rounded-lg text-sm font-medium
+           transition-all duration-150;
+    color: var(--ink-dim);
+    background: transparent;
+  }
+  .btn-ghost:hover {
+    background: rgba(232, 234, 240, 0.06);
+    color: var(--ink);
+  }
+
+  .btn-danger {
+    @apply inline-flex items-center justify-center gap-2
+           px-4 py-2 rounded-lg text-sm font-medium
+           transition-all duration-150;
+    background: var(--danger-dim);
+    border: 1px solid rgba(255, 77, 109, 0.2);
+    color: var(--danger);
+  }
+  .btn-danger:hover {
+    background: rgba(255, 77, 109, 0.18);
+  }
+
+  .btn-success {
+    @apply inline-flex items-center justify-center gap-2
+           px-4 py-2 rounded-lg text-sm font-medium
+           transition-all duration-150;
+    background: var(--accent-dim);
+    border: 1px solid rgba(0, 212, 160, 0.2);
+    color: var(--accent);
+  }
+  .btn-success:hover {
+    background: rgba(0, 212, 160, 0.18);
+  }
+
+  .btn-icon {
+    @apply inline-flex items-center justify-center
+           w-8 h-8 rounded-lg
+           transition-all duration-150;
+    color: var(--ink-dim);
+  }
+  .btn-icon:hover {
+    background: rgba(232, 234, 240, 0.06);
+    color: var(--ink);
+  }
+
+  /* ─────────────────────────────────────────────────────────
+     INPUTS
+  ───────────────────────────────────────────────────────── */
+
+  .input {
+    @apply w-full px-3 py-2 rounded-lg text-sm
+           transition-all duration-150;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--ink);
+  }
+  .input::placeholder {
+    color: var(--ink-dim);
+    opacity: 0.7;
+  }
+  .input:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px var(--primary-dim);
+  }
+  .input:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  .input-label {
+    @apply block text-xs font-medium mb-1.5;
+    color: var(--ink-dim);
+  }
+
+  /* ─────────────────────────────────────────────────────────
+     CARDS
+  ───────────────────────────────────────────────────────── */
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+
+  .card-hover {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    transition: border-color 0.15s, transform 0.15s;
+    cursor: pointer;
+  }
+  .card-hover:hover {
+    border-color: rgba(232, 234, 240, 0.12);
+    transform: translateY(-1px);
+  }
+
+  /* ─────────────────────────────────────────────────────────
+     BADGES
+  ───────────────────────────────────────────────────────── */
+
+  .badge {
+    @apply inline-flex items-center gap-1 px-2 py-0.5
+           text-xs font-medium;
+    border-radius: var(--radius-sm);
+    background: rgba(232, 234, 240, 0.08);
+    color: var(--ink-dim);
+  }
+
+  .badge-success {
+    @apply badge;
+    background: var(--accent-dim);
+    color: var(--accent);
+  }
+
+  .badge-warning {
+    @apply badge;
+    background: var(--warning-dim);
+    color: var(--warning);
+  }
+
+  .badge-danger {
+    @apply badge;
+    background: var(--danger-dim);
+    color: var(--danger);
+  }
+
+  .badge-info {
+    @apply badge;
+    background: var(--primary-dim);
+    color: var(--primary);
+  }
+
+  .badge-neutral {
+    @apply badge;
+  }
+
+  /* ─────────────────────────────────────────────────────────
+     TABLE
+  ───────────────────────────────────────────────────────── */
+
+  .table-container {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+
+  .table-header {
+    @apply px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider;
+    background: rgba(28, 31, 42, 0.5);
+    color: var(--ink-dim);
+  }
+
+  .table-cell {
+    @apply px-4 py-3 text-sm;
+    color: rgba(232, 234, 240, 0.75);
+    border-top: 1px solid var(--border);
+  }
+
+  .table-row {
+    transition: background 0.1s;
+  }
+  .table-row:hover {
+    background: rgba(232, 234, 240, 0.025);
+  }
+
+  /* ─────────────────────────────────────────────────────────
+     SIDEBAR NAV — Signature Moment
+  ───────────────────────────────────────────────────────── */
+
+  .nav-item {
+    @apply flex items-center gap-2.5 px-3 py-2
+           rounded-lg text-sm font-medium
+           transition-all duration-150 cursor-pointer;
+    color: var(--ink-dim);
+    position: relative;
+  }
+  .nav-item:hover {
+    background: rgba(232, 234, 240, 0.05);
+    color: var(--ink);
+  }
+
+  /* ★ THE SIGNATURE MOMENT ★
+     Active nav indicator: a primary-colored bar that springs
+     in from center on every route change.
+  */
+  .nav-item-active {
+    @apply flex items-center gap-2.5 px-3 py-2
+           rounded-lg text-sm font-medium cursor-pointer;
+    color: var(--ink);
+    background: var(--primary-dim);
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* The glowing left bar */
+  .nav-item-active::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%) scaleY(0);
+    width: 2.5px;
+    height: 55%;
+    background: var(--primary);
+    border-radius: 0 3px 3px 0;
+    box-shadow: 0 0 8px var(--primary-glow);
+    animation: navIndicator 0.28s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  }
+
+  /* The icon in active state */
+  .nav-item-active svg {
+    color: var(--primary);
+    filter: drop-shadow(0 0 4px var(--primary-glow));
+  }
+
+  @keyframes navIndicator {
+    0%   { transform: translateY(-50%) scaleY(0); opacity: 0; }
+    100% { transform: translateY(-50%) scaleY(1); opacity: 1; }
+  }
+
+  /* ─────────────────────────────────────────────────────────
+     MOBILE BOTTOM NAV
+  ───────────────────────────────────────────────────────── */
+
+  .bottom-nav-item {
+    @apply flex flex-col items-center gap-1
+           min-w-[48px] py-2 px-3
+           text-xs font-medium
+           transition-all duration-150;
+    color: var(--ink-dim);
+  }
+
+  .bottom-nav-item-active {
+    @apply flex flex-col items-center gap-1
+           min-w-[48px] py-2 px-3
+           text-xs font-medium;
+    color: var(--primary);
+  }
+  .bottom-nav-item-active svg {
+    filter: drop-shadow(0 0 4px var(--primary-glow));
+  }
+
+  /* ─────────────────────────────────────────────────────────
+     SKELETON LOADING
+  ───────────────────────────────────────────────────────── */
+
+  .skeleton {
+    background: linear-gradient(
+      90deg,
+      var(--border) 25%,
+      rgba(28, 31, 42, 0.8) 50%,
+      var(--border) 75%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.8s linear infinite;
+    border-radius: var(--radius-sm);
+  }
+
+  @keyframes shimmer {
+    0%   { background-position: -200% 0; }
+    100% { background-position:  200% 0; }
+  }
+
+  /* ─────────────────────────────────────────────────────────
+     DIVIDER
+  ───────────────────────────────────────────────────────── */
+
+  .divider {
+    border-top: 1px solid var(--border);
+  }
+
+  /* ─────────────────────────────────────────────────────────
+     PAGE TRANSITION
+  ───────────────────────────────────────────────────────── */
+
+  .page-enter {
+    animation: fadeIn 0.3s ease both;
+  }
+
+  /* ─────────────────────────────────────────────────────────
+     MODAL / OVERLAY ANIMATIONS
+  ───────────────────────────────────────────────────────── */
+
+  /* Backdrop fades in */
+  .modal-backdrop {
+    animation: fadeIn 0.2s ease both;
+  }
+
+  /* Modal card pops up with spring */
+  .modal-content {
+    animation: modalPop 0.32s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  }
+
+  /* ─────────────────────────────────────────────────────────
+     STAT / KPI CARDS
+  ───────────────────────────────────────────────────────── */
+
+  .kpi-card {
+    transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1),
+                box-shadow 0.18s ease,
+                border-color 0.18s ease;
+  }
+  .kpi-card:hover {
+    transform: translateY(-3px) scale(1.01);
+    box-shadow: 0 12px 32px rgba(0,0,0,0.35);
+    border-color: rgba(232,234,240,0.12);
+  }
+
+  /* ─────────────────────────────────────────────────────────
+     INTERACTIVE CARDS
+  ───────────────────────────────────────────────────────── */
+
+  .card-interactive {
+    transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1),
+                box-shadow 0.18s ease,
+                border-color 0.18s ease;
+  }
+  .card-interactive:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+    border-color: rgba(232,234,240,0.12);
+  }
+
+  /* ─────────────────────────────────────────────────────────
+     URGENT / OVERDUE PULSE BADGE
+  ───────────────────────────────────────────────────────── */
+
+  .badge-urgent-pulse {
+    animation: urgentPulse 2s ease-in-out infinite;
+  }
+
+  /* ─────────────────────────────────────────────────────────
+     PROGRESS BAR
+  ───────────────────────────────────────────────────────── */
+
+  .progress-fill {
+    animation: progressFill 0.9s cubic-bezier(0.22, 1, 0.36, 1) both;
+    animation-delay: 0.3s;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   KEYFRAMES — all referenced animations defined here
+═══════════════════════════════════════════════════════════ */
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(18px); }
+  to   { opacity: 1; transform: translateY(0);    }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes fadeDown {
+  from { opacity: 0; transform: translateY(-12px); }
+  to   { opacity: 1; transform: translateY(0);     }
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-10px); }
+  to   { opacity: 1; transform: translateY(0);     }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(24px); }
+  to   { opacity: 1; transform: translateY(0);    }
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.93); }
+  to   { opacity: 1; transform: scale(1);    }
+}
+
+/* Spring-pop for modals — overshoots slightly then settles */
+@keyframes modalPop {
+  0%   { opacity: 0; transform: scale(0.88) translateY(12px); }
+  60%  { opacity: 1; transform: scale(1.02) translateY(-2px); }
+  100% { opacity: 1; transform: scale(1)    translateY(0);    }
+}
+
+/* Badge pulse for urgent / overdue items */
+@keyframes urgentPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 77, 109, 0.4); }
+  50%       { box-shadow: 0 0 0 5px rgba(255, 77, 109, 0);  }
+}
+
+/* KPI number count-up feel */
+@keyframes countUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Progress bar fill left→right */
+@keyframes progressFill {
+  from { width: 0; }
+}
+
+/* Gentle float for empty-state icons */
+@keyframes floatY {
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(-6px); }
+}
+
+/* Slow accent pulse for highlights */
+@keyframes accentGlow {
+  0%, 100% { box-shadow: 0 0 0 0 var(--primary-glow); }
+  50%       { box-shadow: 0 0 16px 4px var(--primary-glow); }
+}
+
+@layer utilities {
+  .text-balance { text-wrap: balance; }
+  .tabular-nums { font-variant-numeric: tabular-nums; }
+
+  /* Color token utilities */
+  .text-ink       { color: var(--ink); }
+  .text-ink-dim   { color: var(--ink-dim); }
+  .text-primary   { color: var(--primary); }
+  .text-accent    { color: var(--accent); }
+  .text-danger    { color: var(--danger); }
+  .text-warning   { color: var(--warning); }
+
+  .bg-bg       { background-color: var(--bg); }
+  .bg-surface  { background-color: var(--surface); }
+  .bg-primary-dim  { background-color: var(--primary-dim); }
+  .bg-accent-dim   { background-color: var(--accent-dim); }
+  .bg-danger-dim   { background-color: var(--danger-dim); }
+  .bg-warning-dim  { background-color: var(--warning-dim); }
+
+  .border-edge     { border-color: var(--border); }
+  .border-primary  { border-color: var(--primary); }
+  .border-accent   { border-color: var(--accent); }
+  .border-danger   { border-color: var(--danger); }
+
+  /* Display font utility */
+  .font-display { font-family: 'Syne', 'Inter', sans-serif; }
+
+  /* ── Entry animation utilities ─────────────────────────── */
+  .animate-fade-in    { animation: fadeIn    0.28s ease both; }
+  .animate-fade-up    { animation: fadeUp    0.4s  cubic-bezier(0.22, 1, 0.36, 1) both; }
+  .animate-fade-down  { animation: fadeDown  0.35s cubic-bezier(0.22, 1, 0.36, 1) both; }
+  .animate-slide-down { animation: slideDown 0.28s cubic-bezier(0.22, 1, 0.36, 1) both; }
+  .animate-slide-up   { animation: slideUp   0.35s cubic-bezier(0.22, 1, 0.36, 1) both; }
+  .animate-scale-in   { animation: scaleIn   0.28s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+  .animate-modal-pop  { animation: modalPop  0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+  .animate-count-up   { animation: countUp   0.5s  cubic-bezier(0.22, 1, 0.36, 1) both; }
+  .animate-float-y    { animation: floatY    3s    ease-in-out infinite; }
+  .animate-pulse-slow { animation: urgentPulse 2.5s ease-in-out infinite; }
+
+  /* Animation delays for stagger */
+  .delay-0   { animation-delay: 0ms; }
+  .delay-50  { animation-delay: 50ms; }
+  .delay-100 { animation-delay: 100ms; }
+  .delay-150 { animation-delay: 150ms; }
+  .delay-200 { animation-delay: 200ms; }
+  .delay-250 { animation-delay: 250ms; }
+  .delay-300 { animation-delay: 300ms; }
+  .delay-350 { animation-delay: 350ms; }
+  .delay-400 { animation-delay: 400ms; }
+  .delay-500 { animation-delay: 500ms; }
+  .delay-600 { animation-delay: 600ms; }
+  .delay-700 { animation-delay: 700ms; }
+}

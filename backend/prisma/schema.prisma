@@ -1,0 +1,586 @@
+// TenantOS — Prisma Schema
+// Database: PostgreSQL (Supabase)
+// Run: npx prisma migrate dev --name init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ENUMS
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum PropertyType {
+  residential
+  commercial
+  pg
+  hostel
+}
+
+enum UnitStatus {
+  occupied
+  vacant
+  under_maintenance
+}
+
+enum Furnishing {
+  furnished
+  semi
+  unfurnished
+}
+
+enum KycStatus {
+  not_started
+  pending
+  verified
+  rejected
+}
+
+enum PoliceVerificationStatus {
+  not_started
+  pending
+  verified
+  rejected
+}
+
+enum IdProofType {
+  aadhaar
+  passport
+  voter_id
+  driving_license
+  pan
+}
+
+enum LeaseStatus {
+  draft
+  active
+  notice
+  expired
+  terminated
+}
+
+enum EsignStatus {
+  pending
+  landlord_signed
+  tenant_signed
+  completed
+  rejected
+}
+
+enum RentStatus {
+  pending
+  paid
+  overdue
+  late
+  waived
+}
+
+enum PaymentMethod {
+  upi
+  neft
+  rtgs
+  imps
+  cash
+  cheque
+  card
+}
+
+enum MaintenanceCategory {
+  plumbing
+  electrical
+  appliance
+  structural
+  pest
+  cleaning
+  carpentry
+  painting
+  other
+}
+
+enum MaintenancePriority {
+  low
+  medium
+  high
+  urgent
+}
+
+enum MaintenanceStatus {
+  open
+  acknowledged
+  in_progress
+  resolved
+  closed
+  cancelled
+}
+
+enum ActivityType {
+  payment
+  maintenance
+  lease
+  tenant
+  property
+  document
+  system
+}
+
+enum DocumentEntityType {
+  tenant
+  landlord
+  lease
+  unit
+  property
+}
+
+enum DocumentType {
+  aadhaar
+  pan
+  passport
+  voter_id
+  driving_license
+  lease_agreement
+  rent_receipt
+  police_verification
+  noc
+  other
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LANDLORD
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Landlord {
+  id               String    @id @default(cuid())
+  name             String
+  phone            String    @unique
+  email            String    @unique
+  pan              String?
+  gstin            String?
+  kyc_status       KycStatus @default(not_started)
+  preferred_lang   String    @default("en")
+  onboarding_done  Boolean   @default(false)
+  hra_eligible     Boolean   @default(false)
+  is_suspended     Boolean   @default(false)
+
+  // Bank details (JSON for flexibility)
+  bank_account     Json?     // { name, ifsc, account_number, bank }
+  upi_id           String?
+
+  subscription_tier       String    @default("free") // "free", "pro", "portfolio"
+  subscription_expires_at DateTime?
+
+  created_at       DateTime  @default(now())
+  updated_at       DateTime  @updatedAt
+
+  // Relations
+  auth             LandlordAuth?
+  properties       Property[]
+  applications     Application[]
+  vendors          Vendor[]
+  activity_log     ActivityLog[]
+  refresh_tokens   RefreshToken[]
+
+  @@map("landlords")
+}
+
+model LandlordAuth {
+  id             String    @id @default(cuid())
+  landlord_id    String    @unique
+  password_hash  String
+  otp_hash       String?
+  otp_expires_at DateTime?
+  reset_token_hash String?
+  reset_token_expires_at DateTime?
+  created_at     DateTime  @default(now())
+  updated_at     DateTime  @updatedAt
+
+  landlord       Landlord @relation(fields: [landlord_id], references: [id], onDelete: Cascade)
+
+  @@map("landlord_auth")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PROPERTY & UNITS
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Property {
+  id              String       @id @default(cuid())
+  landlord_id     String
+  name            String
+  address_line1   String
+  address_line2   String?
+  city            String
+  state           String
+  pincode         String
+  property_type   PropertyType @default(residential)
+  total_units     Int          @default(1)
+  gst_applicable  Boolean      @default(false)
+  gst_rate        Float        @default(0)
+  amenities       Json?        // { parking, lift, generator, security, gym, ... }
+  is_deleted      Boolean      @default(false)
+  created_at      DateTime     @default(now())
+  updated_at      DateTime     @updatedAt
+
+  // Relations
+  landlord        Landlord     @relation(fields: [landlord_id], references: [id], onDelete: Cascade)
+  units           Unit[]
+
+  @@map("properties")
+}
+
+model Unit {
+  id                String     @id @default(cuid())
+  property_id       String
+  unit_number       String
+  unit_type         String     // 1bhk, 2bhk, 3bhk, studio, room, shop, office, bed
+  floor             Int        @default(0)
+  area_sqft         Float?
+  monthly_rent      Float
+  security_deposit  Float      @default(0)
+  status            UnitStatus @default(vacant)
+  furnishing        Furnishing @default(unfurnished)
+  amenities         Json?      // unit-specific amenities
+  photo_urls        String[]   // Supabase Storage URLs
+  description       String?
+  preferred_tenant  String[]
+  available_from    DateTime?
+  is_deleted        Boolean    @default(false)
+  is_published      Boolean    @default(false)
+  created_at        DateTime   @default(now())
+  updated_at        DateTime   @updatedAt
+
+  // Relations
+  property          Property   @relation(fields: [property_id], references: [id], onDelete: Cascade)
+  leases            Lease[]
+  maintenance_requests MaintenanceRequest[]
+  applications      Application[]
+
+  @@unique([property_id, unit_number])
+  @@map("units")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TENANT
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Tenant {
+  id                          String                   @id @default(cuid())
+  name                        String
+  phone                       String                   @unique
+  email                       String?
+  aadhaar_number              String?                  // store masked: XXXX-XXXX-1234
+  aadhaar_verified            Boolean                  @default(false)
+  pan                         String?
+  profession                  String?
+  police_verification_status  PoliceVerificationStatus @default(not_started)
+  police_verification_date    DateTime?
+  id_proof_type               IdProofType?
+  whatsapp_opted_in           Boolean                  @default(false)
+  emergency_contact           Json?                    // { name, phone, relation }
+  notes                       String?
+  membership_tier             String                   @default("free") // "free", "basic", "pro", "yearly"
+  membership_expires_at       DateTime?
+  razorpay_subscription_id    String?
+  referral_code               String?                  @unique // auto-generated short code
+  referred_by_code            String?                  // code used during signup
+  is_flagged                  Boolean                  @default(false)
+  is_deleted                  Boolean                  @default(false)
+  created_at                  DateTime                 @default(now())
+  updated_at                  DateTime                 @updatedAt
+
+  // Relations
+  auth                        TenantAuth?
+  leases                      Lease[]
+  applications                Application[]
+  maintenance_requests        MaintenanceRequest[]
+  documents                   Document[]
+  referrals_made              Referral[]               @relation("ReferrerTenant")
+  referral_used               Referral?                @relation("ReferredTenant")
+
+  @@map("tenants")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// REFERRALS
+// ─────────────────────────────────────────────────────────────────────────────
+model Referral {
+  id              String   @id @default(cuid())
+  referrer_id     String
+  referred_id     String?  @unique // tenant who signed up via referral
+  referred_phone  String?           // phone number they shared with (if not yet signed up)
+  status          String   @default("pending") // pending | signed_up | rewarded
+  reward_amount   Int      @default(200)       // INR credited on conversion
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  referrer        Tenant   @relation("ReferrerTenant", fields: [referrer_id], references: [id])
+  referred        Tenant?  @relation("ReferredTenant", fields: [referred_id], references: [id])
+
+  @@map("referrals")
+}
+
+model TenantAuth {
+  id              String    @id @default(cuid())
+  tenant_id       String    @unique
+  password_hash   String?
+  otp_hash        String?
+  otp_expires_at  DateTime?
+  reset_token_hash String?
+  reset_token_expires_at DateTime?
+  last_login_at   DateTime?
+  created_at      DateTime  @default(now())
+  updated_at      DateTime  @updatedAt
+
+  tenant          Tenant    @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+
+  @@map("tenant_auth")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LEASE
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Lease {
+  id                       String      @id @default(cuid())
+  unit_id                  String
+  tenant_id                String
+  start_date               DateTime
+  end_date                 DateTime
+  monthly_rent             Float
+  security_deposit         Float       @default(0)
+  rent_due_day             Int         @default(1)  // day of month (1-28)
+  status                   LeaseStatus @default(draft)
+  esign_status             EsignStatus @default(pending)
+  signed_by_tenant_at      DateTime?
+  signed_by_landlord_at    DateTime?
+  state_template           String?     // Karnataka, Maharashtra, etc.
+  annual_escalation_pct    Float       @default(0)
+  notice_period_days       Int         @default(30)
+  tds_applicable           Boolean     @default(false)
+  agreement_clauses        String[]    // array of clause strings
+  agreement_pdf_url        String?     // Supabase Storage URL
+  is_deleted               Boolean     @default(false)
+  created_at               DateTime    @default(now())
+  updated_at               DateTime    @updatedAt
+
+  // Relations
+  unit                     Unit        @relation(fields: [unit_id], references: [id])
+  tenant                   Tenant      @relation(fields: [tenant_id], references: [id])
+  rent_collections         RentCollection[]
+  co_tenant_splits         CoTenantSplit[]
+
+  @@map("leases")
+}
+
+model CoTenantSplit {
+  id         String  @id @default(cuid())
+  lease_id   String
+  name       String
+  phone      String?
+  share_pct  Float   // percentage share (0-100)
+  amount     Float   // calculated amount
+
+  lease      Lease   @relation(fields: [lease_id], references: [id], onDelete: Cascade)
+
+  @@map("co_tenant_splits")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RENT COLLECTIONS
+// ─────────────────────────────────────────────────────────────────────────────
+
+model RentCollection {
+  id                  String         @id @default(cuid())
+  lease_id            String
+  due_date            DateTime
+  amount_due          Float
+  amount_paid         Float          @default(0)
+  status              RentStatus     @default(pending)
+  payment_method      PaymentMethod?
+  upi_ref             String?        // UPI transaction ID
+  razorpay_order_id   String?
+  razorpay_payment_id String?
+  receipt_number      String?        @unique
+  receipt_pdf_url     String?        // Supabase Storage URL
+  late_fee_applied    Float          @default(0)
+  tds_deducted        Float          @default(0)
+  gst_amount          Float          @default(0)
+  paid_at             DateTime?
+  notes               String?
+  created_at          DateTime       @default(now())
+  updated_at          DateTime       @updatedAt
+
+  // Relations
+  lease               Lease          @relation(fields: [lease_id], references: [id])
+  co_tenant_payments  CoTenantPayment[]
+
+  @@map("rent_collections")
+}
+
+model CoTenantPayment {
+  id                  String         @id @default(cuid())
+  rent_collection_id  String
+  name                String
+  amount              Float
+  paid_at             DateTime?
+  method              PaymentMethod?
+  upi_ref             String?
+  status              RentStatus     @default(pending)
+
+  rent_collection     RentCollection @relation(fields: [rent_collection_id], references: [id], onDelete: Cascade)
+
+  @@map("co_tenant_payments")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MAINTENANCE
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Vendor {
+  id          String              @id @default(cuid())
+  landlord_id String
+  name        String
+  category    MaintenanceCategory
+  phone       String
+  email       String?
+  city        String?
+  rating      Float               @default(0)
+  total_jobs  Int                 @default(0)
+  verified    Boolean             @default(false)
+  notes       String?
+  is_deleted  Boolean             @default(false)
+  created_at  DateTime            @default(now())
+  updated_at  DateTime            @updatedAt
+
+  // Relations
+  landlord    Landlord            @relation(fields: [landlord_id], references: [id], onDelete: Cascade)
+  requests    MaintenanceRequest[]
+
+  @@map("vendors")
+}
+
+model MaintenanceRequest {
+  id               String              @id @default(cuid())
+  unit_id          String
+  tenant_id        String?
+  category         MaintenanceCategory
+  title            String
+  description      String?
+  priority         MaintenancePriority @default(medium)
+  status           MaintenanceStatus   @default(open)
+  vendor_id        String?
+  repair_cost      Float?
+  vendor_rating    Int?                // 1-5 stars
+  photo_urls       String[]            // Supabase Storage URLs
+  whatsapp_sent    Boolean             @default(false)
+  acknowledged_at  DateTime?
+  resolved_at      DateTime?
+  created_at       DateTime            @default(now())
+  updated_at       DateTime            @updatedAt
+
+  // Relations
+  unit             Unit                @relation(fields: [unit_id], references: [id])
+  tenant           Tenant?             @relation(fields: [tenant_id], references: [id])
+  vendor           Vendor?             @relation(fields: [vendor_id], references: [id])
+
+  @@map("maintenance_requests")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DOCUMENTS
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Document {
+  id           String             @id @default(cuid())
+  tenant_id    String?
+  entity_type  DocumentEntityType
+  entity_id    String             // ID of the related entity
+  doc_type     DocumentType
+  storage_url  String             // Supabase Storage URL
+  file_name    String?
+  file_size    Int?               // bytes
+  verified     Boolean            @default(false)
+  verified_at  DateTime?
+  created_at   DateTime           @default(now())
+
+  // Relations
+  tenant       Tenant?            @relation(fields: [tenant_id], references: [id])
+
+  @@map("documents")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AUTH & SESSIONS
+// ─────────────────────────────────────────────────────────────────────────────
+
+model RefreshToken {
+  id           String   @id @default(cuid())
+  landlord_id  String
+  token_hash   String   @unique
+  expires_at   DateTime
+  created_at   DateTime @default(now())
+
+  landlord     Landlord @relation(fields: [landlord_id], references: [id], onDelete: Cascade)
+
+  @@map("refresh_tokens")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ACTIVITY LOG
+// ─────────────────────────────────────────────────────────────────────────────
+
+model ActivityLog {
+  id           String       @id @default(cuid())
+  landlord_id  String
+  type         ActivityType
+  message      String
+  entity_id    String?      // related entity (payment id, tenant id, etc.)
+  created_at   DateTime     @default(now())
+
+  landlord     Landlord     @relation(fields: [landlord_id], references: [id], onDelete: Cascade)
+
+  @@map("activity_log")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// APPLICATIONS
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Application {
+  id            String   @id @default(cuid())
+  tenant_id     String
+  unit_id       String
+  landlord_id   String
+  status        String   @default("pending") // pending, accepted, rejected, scheduled, viewed
+  message       String?
+  visit_date    DateTime?
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  tenant        Tenant   @relation(fields: [tenant_id], references: [id])
+  unit          Unit     @relation(fields: [unit_id], references: [id])
+  landlord      Landlord @relation(fields: [landlord_id], references: [id])
+
+  @@map("applications")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ADMIN
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Admin {
+  id            String    @id @default(cuid())
+  name          String
+  email         String    @unique
+  password_hash String
+  last_login_at DateTime?
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @updatedAt
+
+  @@map("admins")
+}
