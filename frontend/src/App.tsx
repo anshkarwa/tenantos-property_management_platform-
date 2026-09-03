@@ -20,9 +20,9 @@ import {
 } from 'lucide-react';
 
 import LoginPage from './pages/auth/LoginPage';
-import RegisterPage from './pages/auth/RegisterPage';
 import ResetPasswordPage from './pages/auth/ResetPasswordPage';
 import NotificationBell from './components/NotificationBell';
+import { CommandPalette } from './components/CommandPalette';
 import LandingPage from './pages/landing/LandingPage';
 import DashboardPage from './pages/dashboard/DashboardPage';
 import PropertiesPage from './pages/properties/PropertiesPage';
@@ -79,6 +79,7 @@ export default function App() {
   const { t } = useTranslation();
   const location = useLocation();
   const { loggedIn, logout } = useAuth();
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
 
   // Secret admin console — accessible only via /console URL or Shift+Ctrl+A
   if (location.pathname === '/console') {
@@ -214,6 +215,22 @@ export default function App() {
             TenantOS
           </span>
           <NotificationBell />
+        </div>
+
+        {/* Quick Search Ctrl+K trigger */}
+        <div className="px-3 pt-3">
+          <button
+            onClick={() => setCommandPaletteOpen(true)}
+            className="w-full flex items-center justify-between px-3 py-2 rounded-lg bg-[rgba(232,234,240,0.04)] border border-[var(--border)] text-xs text-[var(--ink-dim)] hover:border-[var(--primary)] hover:text-[var(--ink)] transition-all"
+          >
+            <span className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-[var(--primary)] animate-pulse" />
+              Quick Search...
+            </span>
+            <kbd className="font-mono bg-[var(--surface)] px-1.5 py-0.5 rounded text-[10px] border border-[var(--border)]">
+              Ctrl+K
+            </kbd>
+          </button>
         </div>
 
         {/* Nav */}
@@ -413,6 +430,11 @@ export default function App() {
           </div>
         </div>
       )}
+      {/* ── Command Palette (Ctrl+K) ────────────────────────────────────────── */}
+      <CommandPalette
+        isOpen={commandPaletteOpen}
+        onClose={() => setCommandPaletteOpen(false)}
+      />
     </div>
   );
 }

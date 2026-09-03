@@ -34,14 +34,14 @@ export async function dashboardRoutes(fastify: FastifyInstance) {
 
       // Units stats
       prisma.unit.findMany({
-        where: { property: { landlord_id: landlordId }, is_deleted: false },
+        where: { property: { landlord_id: landlordId, is_deleted: false }, is_deleted: false },
         select: { status: true, monthly_rent: true },
       }),
 
       // Active leases
       prisma.lease.count({
         where: {
-          unit: { property: { landlord_id: landlordId } },
+          unit: { property: { landlord_id: landlordId, is_deleted: false } },
           status: 'active',
           is_deleted: false,
         },
@@ -50,7 +50,7 @@ export async function dashboardRoutes(fastify: FastifyInstance) {
       // Leases expiring in 30 days
       prisma.lease.count({
         where: {
-          unit: { property: { landlord_id: landlordId } },
+          unit: { property: { landlord_id: landlordId, is_deleted: false } },
           status: 'active',
           end_date: { gte: now, lte: thirtyDaysLater },
           is_deleted: false,
@@ -60,7 +60,7 @@ export async function dashboardRoutes(fastify: FastifyInstance) {
       // This month's rent
       prisma.rentCollection.findMany({
         where: {
-          lease: { unit: { property: { landlord_id: landlordId } } },
+          lease: { unit: { property: { landlord_id: landlordId, is_deleted: false } } },
           due_date: { gte: startOfMonth, lt: endOfMonth },
         },
         select: { amount_due: true, amount_paid: true, status: true },
@@ -69,7 +69,7 @@ export async function dashboardRoutes(fastify: FastifyInstance) {
       // Open maintenance
       prisma.maintenanceRequest.count({
         where: {
-          unit: { property: { landlord_id: landlordId } },
+          unit: { property: { landlord_id: landlordId, is_deleted: false } },
           status: { in: ['open', 'acknowledged', 'in_progress'] },
         },
       }),

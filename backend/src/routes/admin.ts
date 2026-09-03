@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { authenticateAdmin } from '../middlewares/auth';
 import { successResponse, errorResponse } from '../utils/response';
+import { getSignedUrl } from '../lib/storage';
 
 export async function adminRoutes(fastify: FastifyInstance) {
 
@@ -361,6 +362,91 @@ export async function adminRoutes(fastify: FastifyInstance) {
     return reply.send(successResponse(payments));
   });
 
+  // ── GET /api/admin/kyc-reviews ───────────────────────────────────────────────
+  fastify.get('/kyc-reviews', { preHandler: authenticateAdmin }, async (request, reply) => {
+    const tenants = await prisma.tenant.findMany({
+      where: { kyc_status: { in: ['pending', 'rejected'] } },
+      select: {
+        id: true, name: true, phone: true, email: true,
+        kyc_status: true, aadhaar_verified: true, created_at: true,
+        documents: {
+          where: { doc_type: 'aadhaar' },
+          select: { id: true, storage_url: true, file_name: true, verified: true, created_at: true },
+          orderBy: { created_at: 'desc' },
+          take: 1,
+        },
+      },
+      orderBy: { created_at: 'desc' },
+    });
+    return reply.send(successResponse(tenants));
+  });
+
+  // ── PATCH /api/admin/kyc-reviews/:tenantId/approve ───────────────────────────
+  fastify.patch('/kyc-reviews/:tenantId/approve', { preHandler: authenticateAdmin }, async (request, reply) => {
+    const { tenantId } = request.params as { tenantId: string };
+    await prisma.$transaction([
+      prisma.tenant.update({
+        where: { id: tenantId },
+        data: { kyc_status: 'verified', aadhaar_verified: true },
+      }),
+      prisma.document.updateMany({
+        where: { tenant_id: tenantId, doc_type: 'aadhaar', verified: false },
+        data: { verified: true, verified_at: new Date() },
+      }),
+    ]);
+    return reply.send(successResponse({ message: 'KYC approved' }));
+  });
+
+  // ── PATCH /api/admin/kyc-reviews/:tenantId/reject ────────────────────────────
+  fastify.patch('/kyc-reviews/:tenantId/reject', { preHandler: authenticateAdmin }, async (request, reply) => {
+    const { tenantId } = request.params as { tenantId: string };
+    const { reason } = request.body as { reason?: string };
+    await prisma.tenant.update({
+      where: { id: tenantId },
+      data: { kyc_status: 'rejected' },
+    });
+    return reply.send(successResponse({ message: 'KYC rejected', reason }));
+  });
+
+  // ── GET /api/admin/police-reviews ────────────────────────────────────────────
+  fastify.get('/police-reviews', { preHandler: authenticateAdmin }, async (request, reply) => {
+    const tenants = await prisma.tenant.findMany({
+      where: { police_verification_status: 'pending' },
+      select: {
+        id: true, name: true, phone: true, email: true,
+        police_verification_status: true, notes: true, created_at: true,
+        documents: {
+          where: { doc_type: 'police_verification' },
+          select: { id: true, storage_url: true, file_name: true, verified: true, created_at: true },
+          orderBy: { created_at: 'desc' },
+          take: 1,
+        },
+      },
+      orderBy: { created_at: 'desc' },
+    });
+    return reply.send(successResponse(tenants));
+  });
+
+  // ── PATCH /api/admin/police-reviews/:tenantId/approve ────────────────────────
+  fastify.patch('/police-reviews/:tenantId/approve', { preHandler: authenticateAdmin }, async (request, reply) => {
+    const { tenantId } = request.params as { tenantId: string };
+    await prisma.tenant.update({
+      where: { id: tenantId },
+      data: { police_verification_status: 'verified', police_verification_date: new Date() },
+    });
+    return reply.send(successResponse({ message: 'Police verification approved' }));
+  });
+
+  // ── PATCH /api/admin/police-reviews/:tenantId/reject ─────────────────────────
+  fastify.patch('/police-reviews/:tenantId/reject', { preHandler: authenticateAdmin }, async (request, reply) => {
+    const { tenantId } = request.params as { tenantId: string };
+    await prisma.tenant.update({
+      where: { id: tenantId },
+      data: { police_verification_status: 'rejected' },
+    });
+    return reply.send(successResponse({ message: 'Police verification rejected' }));
+  });
+
   // ── GET /api/admin/maintenance ────────────────────────────────────────────────
   fastify.get('/maintenance', { preHandler: authenticateAdmin }, async (request, reply) => {
     const { status } = request.query as { status?: string };
@@ -387,5 +473,30 @@ export async function adminRoutes(fastify: FastifyInstance) {
       take: 300,
     });
     return reply.send(successResponse(requests));
+  });
+
+  // ── GET /api/admin/signed-doc-url ────────────────────────────────────────────
+  // Generates a 1-hour signed URL for a private tenant document stored in Supabase.
+  // Query param: ?url=<storage_url stored in DB>
+  fastify.get('/signed-doc-url', { preHandler: authenticateAdmin }, async (request, reply) => {
+    const { url } = request.query as { url?: string };
+    if (!url) {
+      return reply.status(400).send(errorResponse(400, 'url query param is required'));
+    }
+
+    try {
+      // Extract bucket and path from the stored URL.
+      // Stored format: https://<project>.supabase.co/storage/v1/object/public/<bucket>/<path>
+      // or:            https://<project>.supabase.co/storage/v1/object/<bucket>/<path>
+      const match = url.match(/\/storage\/v1\/object(?:\/public)?\/([^/]+)\/(.+)$/);
+      if (!match) {
+        return reply.status(400).send(errorResponse(400, 'Unrecognised storage URL format'));
+      }
+      const [, bucket, filePath] = match;
+      const signedUrl = await getSignedUrl(bucket, filePath, 3600);
+      return reply.send(successResponse({ signed_url: signedUrl }));
+    } catch (err: any) {
+      return reply.status(500).send(errorResponse(500, err.message || 'Failed to generate signed URL'));
+    }
   });
 }

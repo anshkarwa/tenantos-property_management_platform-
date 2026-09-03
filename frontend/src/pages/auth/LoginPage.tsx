@@ -184,7 +184,7 @@ export default function LoginPage({ onLogin, onBackToHome, initialView = 'login'
       const ok = await login(email, password);
       if (ok) onLogin();
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to create account');
+      toast.error(err.response?.data?.error?.message || err.response?.data?.message || 'Failed to create account');
     } finally {
       setLocalLoading(false);
     }

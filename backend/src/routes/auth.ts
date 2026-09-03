@@ -479,18 +479,28 @@ export async function authRoutes(fastify: FastifyInstance) {
     const { identifier, password } = result.data;
     const phoneTry = /^\d{10}$/.test(identifier) ? `+91${identifier}` : identifier;
 
-    const tenant = await prisma.tenant.findFirst({
-      where: { OR: [{ email: identifier }, { phone: phoneTry }] },
-      include: { auth: true },
-    });
+    let tenant: any;
+    try {
+      tenant = await prisma.tenant.findFirst({
+        where: { OR: [{ email: identifier }, { phone: phoneTry }] },
+        include: { auth: true },
+      });
+    } catch (dbErr) {
+      fastify.log.error('[tenant/login] DB error: ' + dbErr);
+      return reply.status(503).send(errorResponse(503, 'Service temporarily unavailable. Please try again.'));
+    }
 
-    if (!tenant || !tenant.auth || !tenant.auth.password_hash) {
-      return reply.status(401).send(errorResponse(401, 'Invalid credentials or no password set'));
+    if (!tenant) {
+      return reply.status(401).send(errorResponse(401, 'No account found with this email or phone.'));
+    }
+
+    if (!tenant.auth || !tenant.auth.password_hash) {
+      return reply.status(401).send(errorResponse(401, 'No password set for this account. Use OTP login or click "Forgot password?" to set one.'));
     }
 
     const valid = await bcrypt.compare(password, tenant.auth.password_hash);
     if (!valid) {
-      return reply.status(401).send(errorResponse(401, 'Invalid credentials'));
+      return reply.status(401).send(errorResponse(401, 'Incorrect password. Try again or use "Forgot password?".'));
     }
 
     const { accessToken, refreshToken } = issueTokens(fastify, { id: tenant.id, role: 'tenant' });

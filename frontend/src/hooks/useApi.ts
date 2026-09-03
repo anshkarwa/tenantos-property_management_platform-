@@ -171,6 +171,17 @@ export const useRevenueData = () =>
     queryFn: () => api.get('/api/dashboard/revenue').then(unwrap),
   });
 
+export const usePendingApplications = () =>
+  useQuery<any[]>({
+    queryKey: ['applications', 'pending'],
+    queryFn: () =>
+      api.get('/api/applications').then((res) => {
+        const all = res.data.data || [];
+        return all.filter((a: any) => a.status === 'pending');
+      }),
+    refetchInterval: 60_000, // refresh every 60 s so the banner stays fresh
+  });
+
 // ─── Properties ────────────────────────────────────────────────────────────────
 
 export const useProperties = () =>

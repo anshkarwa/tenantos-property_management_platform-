@@ -185,6 +185,8 @@ model Landlord {
   activity_log     ActivityLog[]
   refresh_tokens   RefreshToken[]
 
+  @@index([email])
+  @@index([phone])
   @@map("landlords")
 }
 
@@ -230,6 +232,7 @@ model Property {
   landlord        Landlord     @relation(fields: [landlord_id], references: [id], onDelete: Cascade)
   units           Unit[]
 
+  @@index([landlord_id])
   @@map("properties")
 }
 
@@ -261,6 +264,8 @@ model Unit {
   applications      Application[]
 
   @@unique([property_id, unit_number])
+  @@index([property_id])
+  @@index([status])
   @@map("units")
 }
 
@@ -275,6 +280,7 @@ model Tenant {
   email                       String?
   aadhaar_number              String?                  // store masked: XXXX-XXXX-1234
   aadhaar_verified            Boolean                  @default(false)
+  kyc_status                  KycStatus                @default(not_started)
   pan                         String?
   profession                  String?
   police_verification_status  PoliceVerificationStatus @default(not_started)
@@ -302,6 +308,8 @@ model Tenant {
   referrals_made              Referral[]               @relation("ReferrerTenant")
   referral_used               Referral?                @relation("ReferredTenant")
 
+  @@index([phone])
+  @@index([email])
   @@map("tenants")
 }
 
@@ -321,6 +329,7 @@ model Referral {
   referrer        Tenant   @relation("ReferrerTenant", fields: [referrer_id], references: [id])
   referred        Tenant?  @relation("ReferredTenant", fields: [referred_id], references: [id])
 
+  @@index([referrer_id])
   @@map("referrals")
 }
 
@@ -374,6 +383,9 @@ model Lease {
   rent_collections         RentCollection[]
   co_tenant_splits         CoTenantSplit[]
 
+  @@index([unit_id])
+  @@index([tenant_id])
+  @@index([status])
   @@map("leases")
 }
 
@@ -387,6 +399,7 @@ model CoTenantSplit {
 
   lease      Lease   @relation(fields: [lease_id], references: [id], onDelete: Cascade)
 
+  @@index([lease_id])
   @@map("co_tenant_splits")
 }
 
@@ -419,6 +432,9 @@ model RentCollection {
   lease               Lease          @relation(fields: [lease_id], references: [id])
   co_tenant_payments  CoTenantPayment[]
 
+  @@index([lease_id])
+  @@index([status])
+  @@index([due_date])
   @@map("rent_collections")
 }
 
@@ -434,6 +450,7 @@ model CoTenantPayment {
 
   rent_collection     RentCollection @relation(fields: [rent_collection_id], references: [id], onDelete: Cascade)
 
+  @@index([rent_collection_id])
   @@map("co_tenant_payments")
 }
 
@@ -461,6 +478,7 @@ model Vendor {
   landlord    Landlord            @relation(fields: [landlord_id], references: [id], onDelete: Cascade)
   requests    MaintenanceRequest[]
 
+  @@index([landlord_id])
   @@map("vendors")
 }
 
@@ -488,6 +506,9 @@ model MaintenanceRequest {
   tenant           Tenant?             @relation(fields: [tenant_id], references: [id])
   vendor           Vendor?             @relation(fields: [vendor_id], references: [id])
 
+  @@index([unit_id])
+  @@index([tenant_id])
+  @@index([status])
   @@map("maintenance_requests")
 }
 
@@ -511,6 +532,8 @@ model Document {
   // Relations
   tenant       Tenant?            @relation(fields: [tenant_id], references: [id])
 
+  @@index([tenant_id])
+  @@index([entity_id])
   @@map("documents")
 }
 
@@ -527,6 +550,7 @@ model RefreshToken {
 
   landlord     Landlord @relation(fields: [landlord_id], references: [id], onDelete: Cascade)
 
+  @@index([landlord_id])
   @@map("refresh_tokens")
 }
 
@@ -544,6 +568,8 @@ model ActivityLog {
 
   landlord     Landlord     @relation(fields: [landlord_id], references: [id], onDelete: Cascade)
 
+  @@index([landlord_id])
+  @@index([created_at])
   @@map("activity_log")
 }
 
@@ -566,6 +592,9 @@ model Application {
   unit          Unit     @relation(fields: [unit_id], references: [id])
   landlord      Landlord @relation(fields: [landlord_id], references: [id])
 
+  @@index([landlord_id])
+  @@index([tenant_id])
+  @@index([unit_id])
   @@map("applications")
 }
 

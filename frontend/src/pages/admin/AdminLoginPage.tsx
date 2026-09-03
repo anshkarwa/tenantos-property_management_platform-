@@ -17,7 +17,7 @@ export default function AdminLoginPage() {
     try {
       await adminLogin(email, password);
     } catch (err: any) {
-      setError(err?.response?.data?.error || 'Invalid credentials');
+      setError(err?.response?.data?.error?.message || err?.response?.data?.message || 'Invalid credentials');
     } finally {
       setLoading(false);
     }

@@ -51,13 +51,33 @@ server.register(multipart, {
   limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB max
 });
 
-// ─── Health check ─────────────────────────────────────────────────────────────
+// ─── Health & Readiness check ───────────────────────────────────────────────
 
 server.get('/health', async () => ({
   status: 'ok',
   timestamp: new Date().toISOString(),
   version: '1.0.0',
 }));
+
+server.get('/ready', async (request, reply) => {
+  try {
+    const { prisma } = await import('./lib/prisma');
+    await prisma.$queryRaw`SELECT 1`;
+    return reply.status(200).send({
+      status: 'ready',
+      database: 'connected',
+      timestamp: new Date().toISOString(),
+    });
+  } catch (err: any) {
+    server.log.error({ err }, 'Readiness check failed - Database disconnected');
+    return reply.status(503).send({
+      status: 'unavailable',
+      database: 'disconnected',
+      error: err.message,
+      timestamp: new Date().toISOString(),
+    });
+  }
+});
 
 // ─── Routes ───────────────────────────────────────────────────────────────────
 server.register(authRoutes,         { prefix: '/api/auth' });

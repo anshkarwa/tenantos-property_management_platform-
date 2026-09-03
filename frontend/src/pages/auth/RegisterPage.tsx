@@ -11,36 +11,41 @@ interface RegisterPageProps {
 
 export default function RegisterPage({ onRegister, onBackToLogin }: RegisterPageProps) {
   const { login } = useAuth();
-  
+
+  // Capture referral code from URL (e.g. /register?ref=ABC123 or landing page ?ref=ABC123)
+  const urlRef = new URLSearchParams(window.location.search).get('ref') || '';
+
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  
+  const [referralCode, setReferralCode] = useState(urlRef);
+
   const [loading, setLoading] = useState(false);
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // Basic validation
     if (password.length < 8) {
       toast.error('Password must be at least 8 characters');
       return;
     }
-    
+
     let formattedPhone = phone.trim();
     if (formattedPhone.length === 10 && !formattedPhone.startsWith('+91')) {
       formattedPhone = '+91' + formattedPhone;
     }
-    
+
     setLoading(true);
     try {
       await api.post('/api/auth/landlord/register', {
         name,
         phone: formattedPhone,
         email,
-        password
+        password,
+        ...(referralCode.trim() && { referral_code: referralCode.trim() }),
       });
       
       // Auto-login after successful registration
@@ -144,6 +149,16 @@ export default function RegisterPage({ onRegister, onBackToLogin }: RegisterPage
                 <p className="text-xs mt-1.5" style={{ color: 'var(--ink-dim)', opacity: 0.7 }}>
                   Must be at least 8 characters
                 </p>
+              </div>
+
+              <div>
+                <label htmlFor="referral" className="input-label">Referral Code <span style={{ color: 'var(--ink-dim)', fontWeight: 400 }}>(optional)</span></label>
+                <input
+                  id="referral" type="text" value={referralCode}
+                  onChange={e => setReferralCode(e.target.value.toUpperCase())}
+                  placeholder="e.g. ABC123"
+                  className="input"
+                />
               </div>
 
               <button type="submit" className="btn-primary w-full mt-2" disabled={loading}>

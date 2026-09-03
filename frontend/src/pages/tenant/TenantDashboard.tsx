@@ -17,7 +17,7 @@ import TokenPaymentFlow from './TokenPaymentFlow';
 // ── Types ────────────────────────────────────────────────────────────────────
 interface TenantProfile {
   id: string; name: string; phone: string; email: string | null;
-  aadhaar_verified: boolean; pan: string | null; profession: string | null;
+  aadhaar_verified: boolean; kyc_status: string; pan: string | null; profession: string | null;
   police_verification_status: string; created_at: string;
   active_lease: ActiveLease | null;
 }
@@ -777,6 +777,8 @@ function LeaseSection({ profile }: { profile: TenantProfile | null }) {
   const [showPaymentFlow, setShowPaymentFlow] = useState(false);
   const [showReceipts, setShowReceipts] = useState(false);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [pendingSignLeases, setPendingSignLeases] = useState<any[]>([]);
+  const [signingId, setSigningId] = useState<string | null>(null);
 
   const handleDownloadReceipt = async (id: string, receiptNum: string) => {
     setDownloadingId(id);
@@ -799,13 +801,32 @@ function LeaseSection({ profile }: { profile: TenantProfile | null }) {
   const lease = profile?.active_lease || null;
 
   const fetchPayments = useCallback(() => {
-    tenantApi.get('/api/tenant/payments')
-      .then(r => setPayments(r.data.data || []))
+    Promise.all([
+      tenantApi.get('/api/tenant/payments'),
+      tenantApi.get('/api/tenant/leases/pending-signature').catch(() => ({ data: { data: [] } })),
+    ])
+      .then(([paymentsRes, sigRes]) => {
+        setPayments(paymentsRes.data.data || []);
+        setPendingSignLeases(sigRes.data.data || []);
+      })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
 
   useEffect(() => { fetchPayments(); }, [fetchPayments]);
+
+  const handleSignLease = async (leaseId: string) => {
+    setSigningId(leaseId);
+    try {
+      await tenantApi.post(`/api/tenant/leases/${leaseId}/sign`);
+      toast.success('Lease signed! Agreement is now complete.');
+      fetchPayments();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error?.message || 'Failed to sign lease');
+    } finally {
+      setSigningId(null);
+    }
+  };
 
   const upcoming = payments.find(p => p.status === 'pending' || p.status === 'overdue');
   const history = payments.filter(p => p !== upcoming);
@@ -848,6 +869,52 @@ function LeaseSection({ profile }: { profile: TenantProfile | null }) {
     <div className="p-5 md:p-8 max-w-5xl mx-auto space-y-6 animate-fade-in">
       <div><h2 className="text-xl font-semibold text-[var(--ink)]">Lease & Rent</h2>
         <p className="text-sm text-[var(--ink-dim)] mt-0.5">Your current lease details and payment history</p></div>
+
+      {/* Pending eSign */}
+      {pendingSignLeases.length > 0 && (
+        <div className="space-y-3">
+          {pendingSignLeases.map((l: any) => (
+            <div key={l.id} className="rounded-xl p-4 space-y-3"
+              style={{ background: 'rgba(61,123,255,0.06)', border: '1px solid rgba(61,123,255,0.25)' }}>
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--primary)' }}>
+                    ✍️ Signature Required
+                  </p>
+                  <p className="text-sm font-medium mt-1" style={{ color: 'var(--ink)' }}>
+                    {l.unit.property.name} · {l.unit.unit_number}
+                  </p>
+                  <p className="text-xs mt-0.5" style={{ color: 'var(--ink-dim)' }}>
+                    {l.unit.property.city} · ₹{l.monthly_rent.toLocaleString('en-IN')}/mo
+                  </p>
+                  <p className="text-xs mt-1" style={{ color: 'var(--ink-dim)' }}>
+                    Landlord signed · Awaiting your signature to activate
+                  </p>
+                </div>
+              </div>
+              {l.agreement_clauses && l.agreement_clauses.length > 0 && (
+                <div className="text-xs space-y-1 px-3 py-2 rounded-lg" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
+                  <p className="font-semibold mb-1" style={{ color: 'var(--ink-dim)' }}>Agreement clauses:</p>
+                  {l.agreement_clauses.slice(0, 3).map((c: string, i: number) => (
+                    <p key={i} style={{ color: 'var(--ink-dim)' }}>• {c}</p>
+                  ))}
+                  {l.agreement_clauses.length > 3 && (
+                    <p style={{ color: 'var(--ink-dim)' }}>+{l.agreement_clauses.length - 3} more clauses</p>
+                  )}
+                </div>
+              )}
+              <button
+                onClick={() => handleSignLease(l.id)}
+                disabled={signingId === l.id}
+                className="btn-primary w-full justify-center">
+                {signingId === l.id
+                  ? <><span className="animate-spin">⟳</span> Signing…</>
+                  : '✍️ Sign & Activate Lease'}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Upcoming due */}
       {loading ? (
@@ -1137,6 +1204,11 @@ function ProfileSection({ profile, onProfileUpdate }: { profile: TenantProfile |
   const [policeSubmitting, setPoliceSubmitting] = useState(false);
   const [policeDone, setPoliceDone]             = useState(false);
 
+  // PAN state
+  const [showPan, setShowPan]                   = useState(false);
+  const [panInput, setPanInput]                 = useState('');
+  const [panSubmitting, setPanSubmitting]       = useState(false);
+
   if (!profile) {
     return (
       <div className="p-5 md:p-8 max-w-5xl mx-auto space-y-4">
@@ -1148,10 +1220,10 @@ function ProfileSection({ profile, onProfileUpdate }: { profile: TenantProfile |
   const policeStatus = profile.police_verification_status;
 
   const kycSteps = [
-    { label: 'Phone Verified', done: true },
-    { label: 'Basic Profile',  done: true },
-    { label: 'Aadhaar KYC',   done: profile.aadhaar_verified },
-    { label: 'PAN Linked',     done: !!profile.pan },
+    { label: 'Phone Verified', done: true,                       pending: false },
+    { label: 'Basic Profile',  done: true,                       pending: false },
+    { label: 'Aadhaar KYC',   done: profile.aadhaar_verified,   pending: !profile.aadhaar_verified && profile.kyc_status === 'pending' },
+    { label: 'PAN Linked',     done: !!profile.pan,              pending: false },
   ];
 
   // Upload file to Supabase via existing endpoint
@@ -1215,6 +1287,26 @@ function ProfileSection({ profile, onProfileUpdate }: { profile: TenantProfile |
     }
   };
 
+  const handlePanSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const clean = panInput.trim().toUpperCase();
+    if (!/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(clean)) {
+      toast.error('Enter a valid 10-character PAN number (e.g. ABCDE1234F)');
+      return;
+    }
+    setPanSubmitting(true);
+    try {
+      await tenantApi.post('/api/tenant/pan/update', { pan: clean });
+      toast.success('PAN number linked successfully!');
+      setShowPan(false);
+      onProfileUpdate?.();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error?.message || 'Failed to update PAN');
+    } finally {
+      setPanSubmitting(false);
+    }
+  };
+
   return (
     <div className="p-5 md:p-8 max-w-5xl mx-auto space-y-6 animate-fade-in">
       <div>
@@ -1232,10 +1324,22 @@ function ProfileSection({ profile, onProfileUpdate }: { profile: TenantProfile |
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {kycSteps.map(step => (
-            <div key={step.label} className={`flex flex-col items-center gap-2 p-3 rounded-lg border text-center ${step.done ? 'bg-[var(--accent-dim)] border-[rgba(0,212,160,0.2)]' : 'bg-[rgba(232,234,240,0.06)] border-[var(--border)]'}`}>
-              {step.done ? <ShieldCheck className="w-5 h-5 text-[var(--accent)]" /> : <ShieldAlert className="w-5 h-5 text-[var(--warning)]" />}
+            <div key={step.label} className={`flex flex-col items-center gap-2 p-3 rounded-lg border text-center ${
+              step.done
+                ? 'bg-[var(--accent-dim)] border-[rgba(0,212,160,0.2)]'
+                : step.pending
+                  ? 'bg-[rgba(61,123,255,0.06)] border-[rgba(61,123,255,0.2)]'
+                  : 'bg-[rgba(232,234,240,0.06)] border-[var(--border)]'
+            }`}>
+              {step.done
+                ? <ShieldCheck className="w-5 h-5 text-[var(--accent)]" />
+                : step.pending
+                  ? <Loader2 className="w-5 h-5 animate-spin" style={{ color: 'var(--primary)' }} />
+                  : <ShieldAlert className="w-5 h-5 text-[var(--warning)]" />}
               <span className="text-xs font-medium text-[var(--ink)]">{step.label}</span>
-              <span className={`text-[10px] ${step.done ? 'text-[var(--accent)]' : 'text-[var(--ink-dim)]'}`}>{step.done ? 'Done' : 'Pending'}</span>
+              <span className={`text-[10px] ${
+                step.done ? 'text-[var(--accent)]' : step.pending ? 'text-[var(--primary)]' : 'text-[var(--ink-dim)]'
+              }`}>{step.done ? 'Done' : step.pending ? 'Under Review' : 'Pending'}</span>
             </div>
           ))}
         </div>
@@ -1250,7 +1354,20 @@ function ProfileSection({ profile, onProfileUpdate }: { profile: TenantProfile |
             { label: 'Phone',      value: profile.phone },
             { label: 'Email',      value: profile.email || '—' },
             { label: 'Profession', value: profile.profession || '—' },
-            { label: 'PAN',        value: profile.pan || '—' },
+            {
+              label: 'PAN',
+              value: (
+                <div className="flex items-center gap-2 justify-end">
+                  <span>{profile.pan || '—'}</span>
+                  <button
+                    onClick={() => { setPanInput(profile.pan || ''); setShowPan(true); }}
+                    className="text-[11px] text-[var(--primary)] font-semibold hover:underline"
+                  >
+                    {profile.pan ? 'Edit' : 'Link PAN'}
+                  </button>
+                </div>
+              ),
+            },
             { label: 'Member Since', value: formatDate(profile.created_at) },
             {
               label: 'Police Verification',
@@ -1266,7 +1383,16 @@ function ProfileSection({ profile, onProfileUpdate }: { profile: TenantProfile |
       </div>
 
       {/* Aadhaar KYC action card */}
-      {!profile.aadhaar_verified && (
+      {!profile.aadhaar_verified && profile.kyc_status === 'pending' && (
+        <div className="rounded-xl p-4 flex items-center gap-3" style={{ background: 'rgba(61,123,255,0.08)', border: '1px solid rgba(61,123,255,0.2)' }}>
+          <Loader2 className="w-4 h-4 animate-spin shrink-0" style={{ color: 'var(--primary)' }} />
+          <div>
+            <p className="text-xs font-semibold" style={{ color: 'var(--ink)' }}>Aadhaar KYC Under Review</p>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--ink-dim)' }}>Your documents have been submitted. Our team will verify within 24 hours.</p>
+          </div>
+        </div>
+      )}
+      {!profile.aadhaar_verified && profile.kyc_status !== 'pending' && (
         <div className="bg-[var(--surface)] border border-[rgba(245,158,11,0.3)] rounded-xl p-5 space-y-3">
           <div className="flex items-start gap-3">
             <AlertTriangle className="w-5 h-5 text-[var(--warning)] shrink-0 mt-0.5" />
@@ -1300,6 +1426,22 @@ function ProfileSection({ profile, onProfileUpdate }: { profile: TenantProfile |
         <div className="rounded-xl p-4 flex items-center gap-3" style={{ background: 'var(--primary-dim)', border: '1px solid rgba(61,123,255,0.2)' }}>
           <Loader2 className="w-4 h-4 animate-spin shrink-0" style={{ color: 'var(--primary)' }} />
           <p className="text-xs" style={{ color: 'var(--ink-dim)' }}>Police verification is <strong style={{ color: 'var(--ink)' }}>under review</strong>. Processing takes 7–10 working days.</p>
+        </div>
+      )}
+
+      {/* Link PAN action card */}
+      {!profile.pan && (
+        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-5 space-y-3">
+          <div className="flex items-start gap-3">
+            <FileText className="w-5 h-5 text-[var(--primary)] shrink-0 mt-0.5" />
+            <div>
+              <h3 className="text-sm font-semibold text-[var(--ink)]">Link PAN Number</h3>
+              <p className="text-xs text-[var(--ink-dim)] mt-0.5">Required for annual rent receipts &gt; ₹1,00,000 for tax exemption under HRA claims.</p>
+            </div>
+          </div>
+          <button className="btn-secondary w-full justify-center" onClick={() => { setPanInput(''); setShowPan(true); }}>
+            Link PAN Card
+          </button>
         </div>
       )}
 
@@ -1439,6 +1581,46 @@ function ProfileSection({ profile, onProfileUpdate }: { profile: TenantProfile |
                 </form>
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Link PAN Modal ─────────────────────────────────────────────────── */}
+      {showPan && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in" style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)' }}
+          onClick={e => { if (e.target === e.currentTarget) setShowPan(false); }}>
+          <div className="w-full max-w-md rounded-2xl p-6 space-y-5 relative animate-scale-in"
+            style={{ background: 'var(--surface)', border: '1px solid var(--border)', boxShadow: '0 24px 64px rgba(0,0,0,0.6)' }}>
+            <button onClick={() => setShowPan(false)} className="btn-icon absolute top-4 right-4"><X className="w-4 h-4" /></button>
+
+            <div>
+              <h2 className="text-base font-bold text-[var(--ink)]" style={{ fontFamily: 'Syne, Inter, sans-serif' }}>
+                {profile.pan ? 'Update PAN Number' : 'Link PAN Number'}
+              </h2>
+              <p className="text-xs text-[var(--ink-dim)] mt-1">Enter your 10-character Permanent Account Number (PAN)</p>
+            </div>
+
+            <form onSubmit={handlePanSubmit} className="space-y-4">
+              <div>
+                <label className="input-label">PAN Number</label>
+                <input
+                  type="text"
+                  maxLength={10}
+                  value={panInput}
+                  onChange={e => setPanInput(e.target.value.toUpperCase())}
+                  placeholder="e.g. ABCDE1234F"
+                  className="input uppercase tracking-wider font-mono"
+                  required
+                />
+                <p className="text-[11px] text-[var(--ink-dim)] mt-1">Format: 5 letters, 4 numbers, 1 letter</p>
+              </div>
+              <div className="flex gap-3">
+                <button type="button" className="btn-secondary flex-1" onClick={() => setShowPan(false)}>Cancel</button>
+                <button type="submit" disabled={panSubmitting} className="btn-primary flex-1 justify-center">
+                  {panSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save PAN'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

@@ -87,6 +87,8 @@ export default function LeasesPage() {
 
   const currentLease = leases.find(l => l.id === selectedLeaseId) ?? null;
 
+  const [esignLoading, setEsignLoading] = useState<string | null>(null);
+
   const handleTriggerAnalysis = (tenantName: string) => {
     toast.promise(
       new Promise((resolve) => setTimeout(resolve, 2000)),
@@ -96,6 +98,19 @@ export default function LeasesPage() {
         error: 'Analysis failed.',
       }
     );
+  };
+
+  const handleRequestESign = async (leaseId: string, tenantName: string) => {
+    setEsignLoading(leaseId);
+    try {
+      await api.post(`/api/leases/${leaseId}/request-esign`);
+      toast.success(`eSign request sent to ${tenantName}`);
+      fetchLeases();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error?.message || 'Failed to send eSign request');
+    } finally {
+      setEsignLoading(null);
+    }
   };
 
   return (
@@ -284,12 +299,26 @@ export default function LeasesPage() {
                 </div>
               )}
 
-              <button
-                onClick={() => toast.success('Aadhaar e-Sign link sent to tenant via WhatsApp!')}
-                className="btn-primary w-full justify-center">
-                <Signature className="w-4 h-4" />
-                {currentLease.esign_status === 'completed' ? 'View Signed Agreement' : 'Send Aadhaar e-Sign'}
-              </button>
+              {currentLease.esign_status === 'completed' ? (
+                <button className="btn-primary w-full justify-center" disabled>
+                  <CheckCircle2 className="w-4 h-4" />
+                  Fully e-Signed
+                </button>
+              ) : currentLease.esign_status === 'landlord_signed' ? (
+                <div className="p-3 rounded-lg text-center text-xs"
+                  style={{ background: 'rgba(61,123,255,0.08)', border: '1px solid rgba(61,123,255,0.2)', color: 'var(--primary)' }}>
+                  ✓ Sent — waiting for tenant to sign
+                </div>
+              ) : (
+                <button
+                  onClick={() => handleRequestESign(currentLease.id, currentLease.tenant.name)}
+                  disabled={esignLoading === currentLease.id}
+                  className="btn-primary w-full justify-center">
+                  {esignLoading === currentLease.id
+                    ? <><Clock className="w-4 h-4 animate-spin" /> Sending…</>
+                    : <><Signature className="w-4 h-4" /> Send Aadhaar e-Sign</>}
+                </button>
+              )}
             </div>
           ) : (
             <div className="text-center py-10 space-y-2">

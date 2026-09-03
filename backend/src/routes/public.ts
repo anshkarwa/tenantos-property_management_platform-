@@ -11,6 +11,9 @@ export async function publicRoutes(fastify: FastifyInstance) {
         is_published: true,
         is_deleted: false,
         status: 'vacant',
+        property: {
+          is_deleted: false,
+        },
       },
       include: {
         property: {

@@ -110,7 +110,10 @@ export default function TenantLoginPage({ onLogin, onBack, onBrowse }: TenantLog
       toast.success(`Welcome back, ${tenant.name.split(' ')[0]}!`);
       onLogin();
     } catch (err: any) {
-      toast.error(err?.response?.data?.error?.message || 'Invalid credentials.');
+      const msg = err?.response?.data?.error?.message
+               || err?.response?.data?.message
+               || 'Login failed. Please try again.';
+      toast.error(msg, { duration: 5000 });
     } finally {
       setLoading(false);
     }

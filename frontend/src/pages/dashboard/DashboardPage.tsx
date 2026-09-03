@@ -1,7 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useDashboardKPIs, useActivityLog, useRevenueData } from '../../hooks/useApi';
+import { useNavigate } from 'react-router-dom';
+import { useDashboardKPIs, useActivityLog, useRevenueData, usePendingApplications } from '../../hooks/useApi';
 import { useAuth } from '../../context/AuthContext';
+import { CardSkeleton } from '../../components/SkeletonLoaders';
 import {
   formatINRCompact,
   formatPercent,
@@ -18,7 +20,10 @@ import {
   TrendingUp,
   ChevronRight,
   Plus,
-  Loader2
+  Loader2,
+  Bell,
+  X,
+  ArrowRight,
 } from 'lucide-react';
 import {
   AreaChart,
@@ -117,15 +122,19 @@ function ChartTooltip({ active, payload, label }: any) {
 export default function DashboardPage() {
   const { t } = useTranslation();
   const { landlord } = useAuth();
+  const navigate = useNavigate();
   const { data: kpi, isLoading: kpiLoading } = useDashboardKPIs();
   const { data: activityData } = useActivityLog();
   const { data: revenueData } = useRevenueData();
+  const { data: pendingApps = [] } = usePendingApplications();
+  const [bannerDismissed, setBannerDismissed] = useState(false);
   const timeKey = getTimeOfDay();
 
   if (kpiLoading || !kpi) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-6 h-6 animate-spin" style={{ color: 'var(--primary)' }} />
+      <div className="space-y-6">
+        <div className="h-8 w-64 skeleton-shimmer rounded-lg" />
+        <CardSkeleton count={4} />
       </div>
     );
   }
@@ -166,10 +175,12 @@ export default function DashboardPage() {
   ];
 
 
+  const showBanner = pendingApps.length > 0 && !bannerDismissed;
+
   return (
     <div className="space-y-6 page-enter">
       {/* ── Page Header ─────────────────────────────────────────────────── */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 header-glow">
         <div>
           <h1
             className="text-xl font-bold"
@@ -182,6 +193,79 @@ export default function DashboardPage() {
           </p>
         </div>
       </div>
+
+      {/* ── Pending Applications Banner ──────────────────────────────────── */}
+      {showBanner && (
+        <div
+          className="relative overflow-hidden rounded-xl animate-fade-up"
+          style={{
+            background: 'linear-gradient(135deg, rgba(245,158,11,0.12) 0%, rgba(234,88,12,0.10) 100%)',
+            border: '1px solid rgba(245,158,11,0.3)',
+          }}
+        >
+          {/* Subtle glow strip on top */}
+          <div
+            className="absolute top-0 left-0 right-0 h-px"
+            style={{ background: 'linear-gradient(90deg, transparent, rgba(245,158,11,0.6), transparent)' }}
+          />
+
+          <div className="flex items-center gap-4 px-5 py-4">
+            {/* Pulsing icon */}
+            <div className="relative shrink-0">
+              <div
+                className="w-10 h-10 rounded-xl flex items-center justify-center"
+                style={{ background: 'rgba(245,158,11,0.15)' }}
+              >
+                <Bell className="w-5 h-5" style={{ color: '#f59e0b' }} />
+              </div>
+              {/* Pulse ring */}
+              <span
+                className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full flex items-center justify-center text-[9px] font-bold"
+                style={{ background: '#f59e0b', color: '#000' }}
+              >
+                {pendingApps.length}
+              </span>
+            </div>
+
+            {/* Text */}
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold" style={{ color: '#f59e0b' }}>
+                {pendingApps.length === 1
+                  ? '1 new application waiting for your response'
+                  : `${pendingApps.length} new applications waiting for your response`}
+              </p>
+              <p className="text-xs mt-0.5 truncate" style={{ color: 'var(--ink-dim)' }}>
+                {pendingApps
+                  .slice(0, 3)
+                  .map((a: any) => a.tenant?.name)
+                  .filter(Boolean)
+                  .join(', ')}
+                {pendingApps.length > 3 ? ` and ${pendingApps.length - 3} more` : ''}
+                {' · '}Tap to review
+              </p>
+            </div>
+
+            {/* CTA */}
+            <button
+              onClick={() => navigate('/applications')}
+              className="shrink-0 flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all duration-150 hover:scale-105 active:scale-95"
+              style={{ background: '#f59e0b', color: '#000' }}
+            >
+              Review Now <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+
+            {/* Dismiss */}
+            <button
+              onClick={() => setBannerDismissed(true)}
+              className="shrink-0 p-1.5 rounded-md transition-colors"
+              style={{ color: 'var(--ink-dim)' }}
+              title="Dismiss"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ── KPI Cards ───────────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

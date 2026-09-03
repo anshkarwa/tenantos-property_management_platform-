@@ -193,6 +193,35 @@ export default function ReferralPage({ onBack }: ReferralPageProps) {
           </div>
         </div>
 
+        {/* Wallet balance card */}
+        <div className="rounded-xl p-5 animate-fade-up delay-75"
+          style={{ background: 'linear-gradient(135deg, #1a2744 0%, #1e3a5f 100%)', border: '1px solid rgba(61,123,255,0.25)' }}>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.55)' }}>
+                TenantOS Wallet Balance
+              </p>
+              <p style={{ fontFamily: 'Syne, Inter, sans-serif', fontWeight: 800, fontSize: '2rem', color: '#fff', letterSpacing: '-0.03em', marginTop: 4 }}>
+                ₹{rewardsEarned}
+              </p>
+              <p className="text-xs mt-1" style={{ color: 'rgba(255,255,255,0.45)' }}>
+                {verifiedCount} verified {verifiedCount === 1 ? 'referral' : 'referrals'} · ₹200 each
+              </p>
+            </div>
+            <div className="w-14 h-14 rounded-full flex items-center justify-center"
+              style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)' }}>
+              <Gift className="w-6 h-6" style={{ color: 'rgba(255,255,255,0.8)' }} />
+            </div>
+          </div>
+          {rewardsEarned > 0 && (
+            <div className="mt-4 pt-4" style={{ borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+              <p className="text-xs" style={{ color: 'rgba(255,255,255,0.5)' }}>
+                💡 Use your wallet credits to renew Pro membership or get rent cashback
+              </p>
+            </div>
+          )}
+        </div>
+
         {/* Referral link */}
         <div className="card p-5 space-y-3 animate-fade-up delay-100">
           <h2 className="text-sm font-semibold" style={{ fontFamily: 'Syne, Inter, sans-serif', color: 'var(--ink)' }}>

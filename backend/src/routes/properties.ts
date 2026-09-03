@@ -16,14 +16,10 @@ const createPropertySchema = z.object({
   gst_applicable: z.boolean().default(false),
   gst_rate: z.number().default(0),
   amenities: z.record(z.boolean()).optional(),
-  is_published: z.boolean().optional(),
-  description: z.string().optional(),
-  preferred_tenants: z.array(z.string()).optional(),
-  available_from: z.string().optional(),
-  photo_urls: z.array(z.string()).optional(),
 });
 
-const createUnitSchema = z.object({
+
+const unitBaseObject = z.object({
   unit_number: z.string().min(1),
   unit_type: z.string().min(1),
   floor: z.number().int().default(0),
@@ -35,10 +31,23 @@ const createUnitSchema = z.object({
   amenities: z.record(z.boolean()).optional(),
   is_published: z.boolean().optional(),
   description: z.string().optional(),
+  preferred_tenant: z.array(z.string()).optional(),
   preferred_tenants: z.array(z.string()).optional(),
-  available_from: z.string().optional(),
+  available_from: z.coerce.date().optional(),
   photo_urls: z.array(z.string()).optional(),
 });
+
+const normalizeUnitData = (data: any) => {
+  const preferred = data.preferred_tenant || data.preferred_tenants;
+  const { preferred_tenants, ...rest } = data;
+  return {
+    ...rest,
+    ...(preferred && { preferred_tenant: preferred }),
+  };
+};
+
+const createUnitSchema = unitBaseObject.transform(normalizeUnitData);
+const updateUnitSchema = unitBaseObject.partial().transform(normalizeUnitData);
 
 export async function propertiesRoutes(fastify: FastifyInstance) {
 
@@ -170,7 +179,7 @@ export async function propertiesRoutes(fastify: FastifyInstance) {
   // ── PUT /api/units/:id ─────────────────────────────────────────────────────
   fastify.put('/units/:id', { preHandler: authenticateLandlord }, async (request, reply) => {
     const { id } = request.params as { id: string };
-    const result = createUnitSchema.partial().safeParse(request.body);
+    const result = updateUnitSchema.safeParse(request.body);
     if (!result.success) {
       return reply.status(400).send(errorResponse(400, result.error.errors[0].message));
     }

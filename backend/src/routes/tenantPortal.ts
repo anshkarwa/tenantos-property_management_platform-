@@ -29,7 +29,7 @@ export async function tenantPortalRoutes(fastify: FastifyInstance) {
       where: { id: tenantId },
       select: {
         id: true, name: true, phone: true, email: true,
-        aadhaar_verified: true, pan: true, profession: true,
+        aadhaar_verified: true, kyc_status: true, pan: true, profession: true,
         police_verification_status: true, whatsapp_opted_in: true,
         emergency_contact: true, created_at: true,
         membership_tier: true, membership_expires_at: true,
@@ -1104,6 +1104,7 @@ export async function tenantPortalRoutes(fastify: FastifyInstance) {
       data: {
         ...(maskedAadhaar ? { aadhaar_number: maskedAadhaar } : {}),
         id_proof_type: doc_type as any,
+        kyc_status: 'pending',
       },
     });
 
@@ -1120,6 +1121,29 @@ export async function tenantPortalRoutes(fastify: FastifyInstance) {
     });
 
     return reply.send(successResponse({ status: 'pending' }, { message: 'KYC documents submitted. Our team will verify within 24 hours.' }));
+  });
+
+  // POST /api/tenant/pan/update — save PAN number
+  fastify.post('/pan/update', { preHandler: authenticateTenant }, async (request, reply) => {
+    const { id: tenantId } = request.user as { id: string };
+    const { pan } = request.body as { pan: string };
+
+    if (!pan || typeof pan !== 'string') {
+      return reply.status(400).send(errorResponse(400, 'PAN number is required'));
+    }
+
+    const cleanPan = pan.trim().toUpperCase();
+    const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
+    if (!panRegex.test(cleanPan)) {
+      return reply.status(400).send(errorResponse(400, 'Invalid PAN format. Must be 10 characters (e.g. ABCDE1234F)'));
+    }
+
+    await prisma.tenant.update({
+      where: { id: tenantId },
+      data: { pan: cleanPan },
+    });
+
+    return reply.send(successResponse({ pan: cleanPan }, { message: 'PAN number linked successfully' }));
   });
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -1257,5 +1281,57 @@ export async function tenantPortalRoutes(fastify: FastifyInstance) {
     });
 
     return reply.status(201).send(successResponse(referral, { message: 'Referral tracked!' }));
+  });
+
+  // GET /api/tenant/leases/pending-signature — leases where landlord signed, awaiting tenant
+  fastify.get('/leases/pending-signature', { preHandler: authenticateTenant }, async (request, reply) => {
+    const { id: tenantId } = request.user as { id: string };
+    const leases = await prisma.lease.findMany({
+      where: {
+        tenant_id: tenantId,
+        is_deleted: false,
+        esign_status: 'landlord_signed',
+      },
+      select: {
+        id: true, monthly_rent: true, start_date: true, end_date: true,
+        esign_status: true, signed_by_landlord_at: true, agreement_clauses: true,
+        unit: {
+          select: {
+            unit_number: true, unit_type: true,
+            property: { select: { name: true, address_line1: true, city: true } },
+          },
+        },
+      },
+      orderBy: { created_at: 'desc' },
+    });
+    return reply.send(successResponse(leases));
+  });
+
+  // POST /api/tenant/leases/:id/sign — tenant digitally signs the lease
+  fastify.post('/leases/:id/sign', { preHandler: authenticateTenant }, async (request, reply) => {
+    const { id: tenantId } = request.user as { id: string };
+    const { id } = request.params as { id: string };
+
+    const lease = await prisma.lease.findFirst({
+      where: { id, tenant_id: tenantId, is_deleted: false },
+      select: { id: true, esign_status: true },
+    });
+    if (!lease) return reply.status(404).send(errorResponse(404, 'Lease not found'));
+    if (lease.esign_status === 'completed') {
+      return reply.status(400).send(errorResponse(400, 'Already signed'));
+    }
+    if (lease.esign_status !== 'landlord_signed') {
+      return reply.status(400).send(errorResponse(400, 'Landlord has not signed yet'));
+    }
+
+    await prisma.lease.update({
+      where: { id },
+      data: {
+        esign_status: 'completed',
+        signed_by_tenant_at: new Date(),
+      },
+    });
+
+    return reply.send(successResponse({ message: 'Lease signed successfully', esign_status: 'completed' }));
   });
 }

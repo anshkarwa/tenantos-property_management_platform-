@@ -17,20 +17,62 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Auto-logout on 401 (but skip for auth routes like login where 401 means invalid credentials)
+// Auto-refresh on 401, logout only if refresh also fails
+let isRefreshing = false;
+let refreshQueue: Array<(token: string) => void> = [];
+
 api.interceptors.response.use(
   (res) => res,
-  (err) => {
+  async (err) => {
     const isAuthRoute = err.config?.url?.includes('/auth/');
-    if (err.response?.status === 401 && !isAuthRoute) {
-      localStorage.removeItem('accessToken');
-      localStorage.removeItem('refreshToken');
-      localStorage.removeItem('landlord');
-      window.location.reload();
+    if (err.response?.status === 401 && !isAuthRoute && !err.config?._retry) {
+      const refreshToken = localStorage.getItem('refreshToken');
+      if (!refreshToken) {
+        // No refresh token — hard logout
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('refreshToken');
+        localStorage.removeItem('landlord');
+        window.location.reload();
+        return Promise.reject(err);
+      }
+
+      if (isRefreshing) {
+        // Queue up requests while a refresh is in progress
+        return new Promise((resolve) => {
+          refreshQueue.push((newToken: string) => {
+            err.config.headers.Authorization = `Bearer ${newToken}`;
+            resolve(api(err.config));
+          });
+        });
+      }
+
+      err.config._retry = true;
+      isRefreshing = true;
+
+      try {
+        const res = await axios.post(`${BASE_URL}/api/auth/refresh`, { refreshToken });
+        const { accessToken: newAccess, refreshToken: newRefresh } = res.data.data;
+        localStorage.setItem('accessToken', newAccess);
+        localStorage.setItem('refreshToken', newRefresh);
+        // Flush queue
+        refreshQueue.forEach((cb) => cb(newAccess));
+        refreshQueue = [];
+        err.config.headers.Authorization = `Bearer ${newAccess}`;
+        return api(err.config);
+      } catch {
+        // Refresh failed — hard logout
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('refreshToken');
+        localStorage.removeItem('landlord');
+        window.location.reload();
+      } finally {
+        isRefreshing = false;
+      }
     }
     return Promise.reject(err);
   }
 );
+
 
 // ─── Auth helpers ─────────────────────────────────────────────────────────────
 

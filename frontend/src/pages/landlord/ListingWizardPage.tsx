@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import {
-  Building2, Home, IndianRupee, Wifi, Car, Shield,
+  Building2, IndianRupee, Wifi, Car, Shield,
   Dumbbell, Zap, Droplets, Wind, CheckCircle2, ArrowRight,
   ArrowLeft, Users, Check, X, ImagePlus, Loader2,
 } from 'lucide-react';
@@ -137,19 +137,20 @@ export default function ListingWizardPage({ onBack, onSuccess }: ListingWizardPa
 
   const handlePublish = async () => {
     setPublishing(true);
+    let propertyId: string | null = null;
     try {
       // 1. Create property
       const propRes = await api.post('/api/properties', {
         name: `${form.unitType.toUpperCase()} at ${form.locality}`,
         address_line1: form.address || form.locality,
         city: form.city,
-        state: 'Maharashtra', // default — can be made a form field later
-        pincode: '400001',    // default
+        state: 'Maharashtra',
+        pincode: '400001',
         property_type: 'residential',
         total_units: 1,
         amenities: form.amenities,
       });
-      const propertyId: string = propRes.data.data.id;
+      propertyId = propRes.data.data.id;
 
       // 2. Create unit
       await api.post(`/api/properties/${propertyId}/units`, {
@@ -165,7 +166,7 @@ export default function ListingWizardPage({ onBack, onSuccess }: ListingWizardPa
         is_published: true,
         photo_urls: photoUrls,
         description: form.description,
-        preferred_tenants: form.preferences,
+        preferred_tenant: form.preferences,
         available_from: form.availableFrom || undefined,
       });
 
@@ -173,7 +174,11 @@ export default function ListingWizardPage({ onBack, onSuccess }: ListingWizardPa
       toast.success('Your listing is live!');
       setTimeout(onSuccess, 2000);
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to publish listing');
+      if (propertyId) {
+        // Rollback property container if unit creation fails
+        api.delete(`/api/properties/${propertyId}`).catch(() => {});
+      }
+      toast.error(err.response?.data?.error?.message || err.response?.data?.message || 'Failed to publish listing');
     } finally {
       setPublishing(false);
     }

@@ -165,6 +165,35 @@ export async function leasesRoutes(fastify: FastifyInstance) {
     return reply.send(successResponse(updated));
   });
 
+  // ── POST /api/leases/:id/request-esign ───────────────────────────────────
+  // Landlord sends eSign request to tenant — marks status as pending & signs landlord side
+  fastify.post('/:id/request-esign', { preHandler: authenticateLandlord }, async (request, reply) => {
+    const { id: landlordId } = request.user as { id: string };
+    const { id } = request.params as { id: string };
+
+    const lease = await prisma.lease.findFirst({
+      where: { id, is_deleted: false, unit: { property: { landlord_id: landlordId } } },
+      select: { id: true, esign_status: true, tenant: { select: { name: true } } },
+    });
+    if (!lease) return reply.status(404).send(errorResponse(404, 'Lease not found'));
+    if (lease.esign_status === 'completed') {
+      return reply.status(400).send(errorResponse(400, 'Lease is already fully signed'));
+    }
+
+    await prisma.lease.update({
+      where: { id },
+      data: {
+        esign_status: 'landlord_signed',
+        signed_by_landlord_at: new Date(),
+      },
+    });
+
+    return reply.send(successResponse({
+      message: `eSign request sent to ${lease.tenant.name}. Waiting for tenant to sign.`,
+      esign_status: 'landlord_signed',
+    }));
+  });
+
   // ── POST /api/leases/:id/terminate ────────────────────────────────────────
   fastify.post('/:id/terminate', { preHandler: authenticateLandlord }, async (request, reply) => {
     const { id: landlordId } = request.user as { id: string };

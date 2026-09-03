@@ -55,6 +55,36 @@
     color: var(--ink);
   }
 
+  /* Glassmorphic header glow */
+  .header-glow {
+    position: relative;
+  }
+  .header-glow::before {
+    content: '';
+    position: absolute;
+    top: -40px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 60%;
+    height: 80px;
+    background: radial-gradient(ellipse at center, rgba(61, 123, 255, 0.15) 0%, rgba(61, 123, 255, 0) 70%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* Skeleton loading animation */
+  .skeleton-shimmer {
+    background: linear-gradient(90deg, var(--surface) 25%, #181C26 50%, var(--surface) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite linear;
+    border-radius: var(--radius-sm);
+  }
+
+  @keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+
   /* Scrollbar */
   ::-webkit-scrollbar { width: 4px; height: 4px; }
   ::-webkit-scrollbar-track { background: transparent; }
